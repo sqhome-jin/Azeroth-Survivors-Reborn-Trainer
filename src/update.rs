@@ -8,14 +8,14 @@ use url::Url;
 
 use crate::diagnostic_log::event;
 
-pub const PROJECT: &str = "https://github.com/nelbin4/Azeroth-Survivors-Reborn-Trainer";
+pub const PROJECT: &str = "https://github.com/sqhome-jin/Azeroth-Survivors-Reborn-Trainer";
 /// Name of the installable release asset for this platform.
 #[cfg(windows)]
 pub const ASSET_NAME: &str = "Azeroth.Survivor.Reborn.Trainer.exe";
 #[cfg(not(windows))]
 pub const ASSET_NAME: &str = "Azeroth.Survivor.Reborn.Trainer.macos-arm64.zip";
 const API: &str =
-    "https://api.github.com/repos/nelbin4/Azeroth-Survivors-Reborn-Trainer/releases/latest";
+    "https://api.github.com/repos/sqhome-jin/Azeroth-Survivors-Reborn-Trainer/releases/latest";
 const MAX_DOWNLOAD: u64 = 64 * 1024 * 1024;
 
 #[derive(Deserialize)]

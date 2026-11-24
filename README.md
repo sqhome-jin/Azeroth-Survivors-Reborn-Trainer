@@ -1,7 +1,13 @@
 # Azeroth Survivor Reborn Trainer
 
-Standalone Windows x64 trainer for [Azeroth Survivors: Reborn](https://azreborn.com/),
-written in Rust. [Download the latest standalone EXE](https://github.com/nelbin4/Azeroth-Survivors-Reborn-Trainer/releases/latest)
+Rust trainer for solo runs in [Azeroth Survivors: Reborn](https://azreborn.com/).
+Find your character, read current combat stats, and apply individual targets.
+Available for **Windows x64** and **macOS on Apple Silicon**.
+
+| Platform | Download |
+| --- | --- |
+| Windows x64 | [Latest stable EXE](https://github.com/sqhome-jin/Azeroth-Survivors-Reborn-Trainer/releases/latest) |
+| macOS Apple Silicon | [macOS prereleases](https://github.com/sqhome-jin/Azeroth-Survivors-Reborn-Trainer/releases) |
 
 ## Use the trainer
 
@@ -65,8 +71,8 @@ previous EXE.
 
 ## macOS on Apple Silicon
 
-Download the **Reborn-macOS-arm64** artifact from a successful GitHub Actions
-run and extract the trainer ZIP inside it. Move **Azeroth Survivor Reborn
+Download `Azeroth.Survivor.Reborn.Trainer.macos-arm64.zip` from the macOS
+prerelease and extract it. Move **Azeroth Survivor Reborn
 Trainer.app** to Applications. The app is ad-hoc signed with the debugger
 entitlement so it can attach to the game. macOS may require you to approve the
 app under **System Settings → Privacy & Security** after the first launch
@@ -83,14 +89,14 @@ Use the title bar menus to choose English or Simplified Chinese and System,
 Light, or Dark appearance. The menus use native Liquid Glass on macOS 26 and
 later. The app remembers both selections.
 
-Download new macOS builds manually from Actions. The log is at
+Download new macOS builds manually from GitHub Releases. The log is at
 `~/Library/Application Support/Azeroth Survivor Reborn Trainer/reborn-rust.log`.
 
 ## Repository
 
 - `src/` contains the Rust trainer, stat verification, Windows integration, and updater.
 - `assets/` contains the app icon and logo.
-- `.github/workflows/release.yml` builds and tests both platforms, uploads the macOS app as an Actions artifact, and publishes the standalone Windows EXE for newer versions on `main`.
+- `.github/workflows/release.yml` builds and tests both platforms, publishes the standalone Windows EXE as a stable release, and publishes the macOS ZIP as a separate prerelease for newer versions on `main`.
 
 ### Local folders
 

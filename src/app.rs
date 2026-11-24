@@ -31,32 +31,32 @@ const MINT: Color32 = if MACOS {
     Color32::from_rgb(114, 224, 190)
 };
 const FRAME: Color32 = if MACOS {
-    Color32::from_rgb(24, 26, 31)
+    Color32::from_rgb(27, 27, 30)
 } else {
     Color32::from_rgb(20, 32, 44)
 };
 const SURFACE: Color32 = if MACOS {
-    Color32::from_rgb(39, 43, 52)
+    Color32::from_rgb(35, 35, 39)
 } else {
     Color32::from_rgb(36, 54, 75)
 };
 const MUTED: Color32 = if MACOS {
-    Color32::from_rgb(163, 171, 187)
+    Color32::from_rgb(165, 164, 176)
 } else {
     Color32::from_rgb(169, 184, 200)
 };
 const TEXT: Color32 = if MACOS {
-    Color32::from_rgb(235, 239, 248)
+    Color32::from_rgb(238, 237, 243)
 } else {
     Color32::from_rgb(229, 233, 239)
 };
 const ACCENT: Color32 = if MACOS {
-    Color32::from_rgb(110, 165, 255)
+    Color32::from_rgb(199, 184, 255)
 } else {
     Color32::from_rgb(86, 214, 176)
 };
 const ACCENT_TEXT: Color32 = if MACOS {
-    Color32::from_rgb(14, 28, 53)
+    Color32::from_rgb(32, 24, 56)
 } else {
     Color32::from_rgb(16, 37, 31)
 };
@@ -367,23 +367,23 @@ impl TrainerApp {
         visuals.selection.bg_fill = Color32::from_rgb(35, 68, 63);
         if MACOS {
             let mut light = egui::Visuals::light();
-            light.panel_fill = Color32::from_rgb(242, 244, 249);
+            light.panel_fill = Color32::from_rgb(247, 246, 249);
             light.window_fill = Color32::WHITE;
             light.faint_bg_color = Color32::from_black_alpha(5);
-            light.selection.bg_fill = Color32::from_rgb(211, 228, 255);
+            light.selection.bg_fill = Color32::from_rgb(234, 229, 248);
             light.selection.stroke.color = Color32::from_rgb(21, 39, 68);
             light.override_text_color = Some(Color32::from_rgb(32, 39, 53));
-            visuals.extreme_bg_color = Color32::from_rgb(22, 24, 29);
+            visuals.extreme_bg_color = Color32::from_rgb(25, 25, 28);
             visuals.faint_bg_color = Color32::from_white_alpha(7);
-            visuals.selection.bg_fill = Color32::from_rgb(43, 67, 105);
+            visuals.selection.bg_fill = Color32::from_rgb(57, 50, 75);
             visuals.selection.stroke.color = TEXT;
             for (palette, backgrounds, border) in [
                 (
                     &mut visuals,
                     [
                         SURFACE,
-                        Color32::from_rgb(54, 62, 77),
-                        Color32::from_rgb(62, 76, 98),
+                        Color32::from_rgb(49, 48, 55),
+                        Color32::from_rgb(64, 57, 78),
                     ],
                     Color32::from_white_alpha(27),
                 ),
@@ -391,8 +391,8 @@ impl TrainerApp {
                     &mut light,
                     [
                         Color32::WHITE,
-                        Color32::from_rgb(232, 238, 248),
-                        Color32::from_rgb(218, 230, 249),
+                        Color32::from_rgb(240, 237, 247),
+                        Color32::from_rgb(230, 223, 245),
                     ],
                     Color32::from_black_alpha(32),
                 ),
@@ -1161,17 +1161,19 @@ impl TrainerApp {
         let found_color = ui.visuals().text_color();
         let unavailable_color = muted_color(ui);
         let mut table = TableBuilder::new(ui)
-            .striped(true)
+            .striped(!MACOS)
             .sense(egui::Sense::click())
             .auto_shrink([false, false]);
         for width in widths {
             table = table.column(Column::exact(width));
         }
         table
-            .header(31.0, |mut header| {
+            .header(if MACOS { 27.0 } else { 31.0 }, |mut header| {
                 for title in titles {
                     header.col(|ui| {
-                        ui.add(egui::Label::new(RichText::new(title).strong()).truncate());
+                        let caption = RichText::new(title).strong();
+                        let caption = if MACOS { caption.small().color(muted_color(ui)) } else { caption };
+                        ui.add(egui::Label::new(caption).truncate());
                     });
                 }
             })
@@ -1195,7 +1197,7 @@ impl TrainerApp {
                     } else {
                         ("-", unavailable_color)
                     };
-                    body.row(29.0, |mut row| {
+                    body.row(if MACOS { 27.0 } else { 29.0 }, |mut row| {
                         row.set_selected(index == self.selected);
                         row.col(|ui| {
                             ui.allocate_ui_with_layout(
@@ -1203,7 +1205,7 @@ impl TrainerApp {
                                 egui::Layout::top_down(egui::Align::Center),
                                 |ui| {
                                     let fill = if MACOS && checked {
-                                        Color32::from_rgb(44, 99, 176)
+                                        Color32::from_rgb(115, 90, 191)
                                     } else if MACOS {
                                         ui.visuals().widgets.inactive.bg_fill
                                     } else if checked {
@@ -1242,7 +1244,12 @@ impl TrainerApp {
                             ui.label(language.text(stat.label, stat.chinese_label));
                         });
                         row.col(|ui| {
-                            ui.label(current.as_deref().unwrap_or("—"));
+                            let value = current.as_deref().unwrap_or("—");
+                            if MACOS && current.is_none() {
+                                ui.colored_label(muted_color(ui), value);
+                            } else {
+                                ui.label(value);
+                            }
                         });
                         row.col(|ui| {
                             ui.label(target);
@@ -1545,7 +1552,7 @@ impl eframe::App for TrainerApp {
         self.poll(context);
         let frame = egui::Frame::new()
             .fill(context.style().visuals.panel_fill)
-            .inner_margin(egui::Margin::same(16));
+            .inner_margin(egui::Margin::same(if MACOS { 20 } else { 16 }));
         egui::TopBottomPanel::bottom("trainer-footer")
             .frame(frame)
             .show(context, |ui| self.footer(context, ui));
@@ -1554,38 +1561,53 @@ impl eframe::App for TrainerApp {
             .show(context, |ui| {
                 ui.horizontal(|ui| {
                     if let Some(logo) = &self.logo {
-                        ui.image((logo.id(), egui::vec2(32.0, 32.0)));
+                        let size = if MACOS { 36.0 } else { 32.0 };
+                        ui.image((logo.id(), egui::vec2(size, size)));
                     }
                     ui.heading(
                         RichText::new(if MACOS { language.text("Reborn Trainer", "Reborn 修改器") } else { "AZEROTH SURVIVORS REBORN" })
-                            .size(if MACOS { 22.0 } else { 26.0 })
+                            .size(if MACOS { 20.0 } else { 26.0 })
                             .color(if MACOS { ui.visuals().text_color() } else { GOLD })
                             .strong(),
                     );
-                });
-                ui.vertical(|ui| {
-                    right_aligned_row(ui, ui.spacing().interact_size.y, |ui| {
-                        if let Some(session) = &self.session {
-                            if MACOS {
-                                ui.colored_label(status_color(ui), language.text("Game connected", "已连接游戏"))
-                                    .on_hover_text(format!("PID {}", session.pid));
+                    if MACOS {
+                        right_aligned_row(ui, 32.0, |ui| {
+                            let (label, tooltip) = if let Some(session) = &self.session {
+                                (language.text("Game connected", "已连接游戏"), Some(format!("PID {}", session.pid)))
+                            } else if self.running {
+                                (language.text("Multiple game processes", "检测到多个游戏进程"), None)
                             } else {
-                                ui.colored_label(status_color(ui), format!("Connected · PID {}", session.pid));
+                                (language.text("Waiting for game", "等待游戏启动"), None)
+                            };
+                            let tint = if self.session.is_some() { status_color(ui) } else { muted_color(ui) };
+                            let status = egui::Frame::new()
+                                .fill(ui.visuals().widgets.inactive.bg_fill)
+                                .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                                .corner_radius(11)
+                                .inner_margin(egui::Margin::symmetric(10, 6))
+                                .show(ui, |ui| ui.label(RichText::new(label).small().color(tint)));
+                            if let Some(tooltip) = tooltip {
+                                status.response.on_hover_text(tooltip);
                             }
-                        } else if self.running {
-                            ui.label(
-                                language.text("Reborn is running. The process could not be uniquely selected.", "游戏正在运行，暂时无法确定要连接的进程。"),
-                            );
-                        } else {
-                            ui.label(language.text("Waiting for Reborn.", "等待游戏启动。"));
-                        }
-                    });
-                    if self.launch_result.is_some() || self.stop_result.is_some() {
-                        ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
-                            ui.allocate_ui(egui::vec2(220.0, 8.0), Self::work_progress);
                         });
                     }
                 });
+                if !MACOS {
+                    right_aligned_row(ui, ui.spacing().interact_size.y, |ui| {
+                        if let Some(session) = &self.session {
+                            ui.colored_label(status_color(ui), format!("Connected · PID {}", session.pid));
+                        } else if self.running {
+                            ui.label("Reborn is running. The process could not be uniquely selected.");
+                        } else {
+                            ui.label("Waiting for Reborn.");
+                        }
+                    });
+                }
+                if self.launch_result.is_some() || self.stop_result.is_some() {
+                    ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
+                        ui.allocate_ui(egui::vec2(220.0, 8.0), Self::work_progress);
+                    });
+                }
                 if let Some(error) = &self.error {
                     ui.colored_label(Color32::LIGHT_RED, error);
                 }
@@ -1612,7 +1634,7 @@ impl eframe::App for TrainerApp {
                         .strong(),
                     );
                 }
-                ui.add_space(8.0);
+                ui.add_space(if MACOS { 17.0 } else { 8.0 });
                 egui::SidePanel::right("selected-stat-editor")
                     .exact_width(EDITOR_WIDTH)
                     .resizable(false)
@@ -1634,7 +1656,15 @@ impl eframe::App for TrainerApp {
                         }
                     });
                 egui::CentralPanel::default()
-                    .frame(egui::Frame::new())
+                    .frame(if MACOS {
+                        egui::Frame::new()
+                            .fill(ui.visuals().widgets.inactive.bg_fill)
+                            .stroke(ui.visuals().widgets.inactive.bg_stroke)
+                            .corner_radius(14)
+                            .inner_margin(egui::Margin::same(12))
+                    } else {
+                        egui::Frame::new()
+                    })
                     .show_inside(ui, |ui| {
                         let width = ui.available_width();
                         self.stats_table(context, ui, width);

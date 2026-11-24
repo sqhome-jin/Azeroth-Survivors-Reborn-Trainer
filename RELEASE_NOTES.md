@@ -1,3 +1,9 @@
+Azeroth Survivor Reborn Trainer v1.1.4
+
+- Add an Apple Silicon build with combat stat discovery, read-only refresh, and individual Apply.
+- Refresh the macOS interface and app icon. The native title bar includes English and Simplified Chinese, light and dark appearance, and Liquid Glass on macOS 26 and later.
+- Publish the macOS ZIP as a separate prerelease. The Windows stable release includes the standalone EXE with self-update support.
+
 Azeroth Survivor Reborn Trainer v1.1.3
 
 - Memory Read mode and the `--mode` and `--find` command-line arguments are removed. Find always locates the Stats panel with OCR, then reads and sets values in memory.

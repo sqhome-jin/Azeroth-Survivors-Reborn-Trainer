@@ -8,6 +8,8 @@
     <string>io.github.sqhome-jin.azeroth-survivor-reborn-trainer</string>
     <key>CFBundleName</key>
     <string>Azeroth Survivor Reborn Trainer</string>
+    <key>CFBundleIconFile</key>
+    <string>Trainer.icns</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
 </dict>

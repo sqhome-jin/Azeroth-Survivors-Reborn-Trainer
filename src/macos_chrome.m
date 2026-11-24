@@ -55,7 +55,7 @@ int trainer_install_macos_chrome(void *rawView) {
     TrainerTitlebar *accessory = [TrainerTitlebar new];
     accessory.layoutAttribute = NSLayoutAttributeRight;
 
-    NSRect bounds = NSMakeRect(0, 0, 208, 30);
+    NSRect bounds = NSMakeRect(0, 0, 220, 30);
     NSView *container = [[NSView alloc] initWithFrame:bounds];
     NSView *controls = [[NSView alloc] initWithFrame:bounds];
     accessory.language = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(8, 3, 93, 24) pullsDown:NO];
@@ -71,9 +71,11 @@ int trainer_install_macos_chrome(void *rawView) {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 260000
     if (@available(macOS 26.0, *)) {
         Class glassClass = NSClassFromString(@"NSGlassEffectView");
-        NSGlassEffectView *glass = [[glassClass alloc] initWithFrame:bounds];
+        NSGlassEffectView *glass = [[glassClass alloc] initWithFrame:NSInsetRect(bounds, 5, 2)];
         if (glass) {
-            glass.cornerRadius = 15;
+            glass.cornerRadius = 13;
+            accessory.language.bordered = NO;
+            accessory.appearance.bordered = NO;
             glass.contentView = controls;
             [container addSubview:glass];
         }
