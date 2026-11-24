@@ -89,6 +89,7 @@ pub fn icon() -> io::Result<egui::IconData> {
 }
 
 struct Search {
+    apply_targets: bool,
     stop: Arc<AtomicBool>,
     // True while OCR is scanning for the Stats panel, so the window can ask for the Character panel.
     waiting_for_panel: Arc<AtomicBool>,
@@ -608,7 +609,7 @@ impl TrainerApp {
                         };
                         let verified = snapshot.stats.is_some();
                         self.snapshot = Some(snapshot);
-                        if verified {
+                        if verified && search.apply_targets {
                             let targets = checked_targets(&self.enabled, &self.targets);
                             if !targets.is_empty() {
                                 self.start_apply(context, targets);
@@ -651,7 +652,7 @@ impl TrainerApp {
                     self.applied_stats.extend(result.applied);
                     let warning = self.field_issues.len();
                     let outcome = if MACOS {
-                        "written and read back"
+                        "confirmed in game memory"
                     } else {
                         "applied"
                     };
@@ -720,9 +721,9 @@ impl TrainerApp {
         context.request_repaint_after(Duration::from_millis(250));
     }
 
-    fn start_find(&mut self, context: &egui::Context) {
+    fn start_find(&mut self, context: &egui::Context, apply_targets: bool) {
         if let Some(session) = self.session.clone() {
-            if !self.commit_target() {
+            if apply_targets && !self.commit_target() {
                 return;
             }
             self.reset_apply();
@@ -730,7 +731,10 @@ impl TrainerApp {
             self.applied_stats.clear();
             self.error = None;
             self.status = "Finding character and stats…".into();
-            event("hunt.requested", format_args!("game_pid={}", session.pid));
+            event(
+                "hunt.requested",
+                format_args!("game_pid={} apply_targets={apply_targets}", session.pid),
+            );
             let stop = Arc::new(AtomicBool::new(false));
             let worker_session = session.clone();
             let worker_stop = stop.clone();
@@ -740,6 +744,7 @@ impl TrainerApp {
                 find_with_fallback(&worker_session, &worker_stop, &worker_waiting)
             });
             self.scan = Some(Search {
+                apply_targets,
                 stop,
                 waiting_for_panel: waiting,
                 started: Instant::now(),
@@ -1084,7 +1089,7 @@ impl TrainerApp {
                         .as_ref()
                         .is_some_and(|s| s.values.contains_key(stat.key));
                     let (status, status_color) = if self.applied_stats.contains(stat.key) {
-                        (if MACOS { "Written" } else { "Applied" }, MINT)
+                        (if MACOS { "Confirmed" } else { "Applied" }, MINT)
                     } else if verified || current.is_some() {
                         ("Found", TEXT)
                     } else {
@@ -1215,8 +1220,18 @@ impl TrainerApp {
                 self.reset_apply();
                 self.status = "Apply cancelled.".into();
             } else {
-                self.start_find(context);
+                self.start_find(context, true);
             }
+        }
+        if MACOS
+            && ui
+                .add_enabled(
+                    !applying && !finding && self.session.is_some(),
+                    Button::new("Read current values").min_size(egui::vec2(width, 29.0)),
+                )
+                .clicked()
+        {
+            self.start_find(context, false);
         }
         let verified_layout = self.snapshot.as_ref().is_some_and(|s| s.stats.is_some());
         if self.scan.is_some() || self.apply.is_some() {
