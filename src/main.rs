@@ -20,6 +20,7 @@ fn main() -> eframe::Result {
         app::icon().expect("embedded trainer icon should decode");
         let core = env!("CARGO_PKG_VERSION").split('-').next().unwrap();
         update::version(core).expect("trainer package version should be valid");
+        #[cfg(windows)]
         if let Some(ready) = arguments.next() {
             update::confirm_ready(std::path::Path::new(&ready)).expect("smoke startup marker");
         }
@@ -28,6 +29,7 @@ fn main() -> eframe::Result {
     let _log = settings::state_directory()
         .and_then(|directory| diagnostic_log::Log::start(directory.join("reborn-rust.log")))
         .ok();
+    #[cfg(windows)]
     if argument
         .as_deref()
         .is_some_and(|value| value == "--install-update" || value == "--smoke-test-update")

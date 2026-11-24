@@ -97,6 +97,7 @@ pub fn recent_lines(path: &Path) -> io::Result<String> {
     Ok(lines.join("\n"))
 }
 
+#[cfg(windows)]
 fn timestamp() -> String {
     use windows_sys::Win32::{Foundation::SYSTEMTIME, System::SystemInformation::GetSystemTime};
 
@@ -106,6 +107,27 @@ fn timestamp() -> String {
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
         utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, utc.wMilliseconds,
+    )
+}
+
+#[cfg(not(windows))]
+fn timestamp() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let seconds = now.as_secs() as libc::time_t;
+    let mut utc: libc::tm = unsafe { std::mem::zeroed() };
+    // gmtime_r writes the broken-down UTC time into the provided struct.
+    unsafe { libc::gmtime_r(&seconds, &mut utc) };
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        utc.tm_year + 1900,
+        utc.tm_mon + 1,
+        utc.tm_mday,
+        utc.tm_hour,
+        utc.tm_min,
+        utc.tm_sec,
+        now.subsec_millis(),
     )
 }
 

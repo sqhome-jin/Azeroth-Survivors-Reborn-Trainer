@@ -1,8 +1,8 @@
-name: Build and release Windows trainer
+name: Build trainer and release Windows EXE
 
 on:
   push:
-    branches: [main, 'codex/rust-migration']
+    branches: [main, 'codex/rust-migration', 'codex/macos-port']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -55,6 +55,27 @@ jobs:
           name: Reborn-Windows-x64
           path: dist/Azeroth.Survivor.Reborn.Trainer.exe
           if-no-files-found: error
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo build --release --locked
+
+      - name: Collect locally runnable scan test
+        run: |
+          set -o pipefail
+          cargo test --locked --no-run --message-format=json |
+            jq -er 'select(.profile.test == true and .target.name == "reborn-trainer" and .executable != null) | .executable' |
+            while IFS= read -r executable; do cp "$executable" reborn-scan-test; done
+          tar -czf reborn-scan-test.tar.gz reborn-scan-test
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: macos-scan-test
+          path: reborn-scan-test.tar.gz
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

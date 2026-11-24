@@ -32,6 +32,11 @@ const ACCENT: Color32 = Color32::from_rgb(86, 214, 176);
 const ACCENT_TEXT: Color32 = Color32::from_rgb(16, 37, 31);
 const EDITOR_WIDTH: f32 = 242.0;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const LOCATE_LABEL: &str = if cfg!(windows) {
+    "Locate exe file"
+} else {
+    "Locate game file"
+};
 
 pub fn icon() -> io::Result<egui::IconData> {
     let image = include_bytes!("../assets/trainer-logo.png");
@@ -189,7 +194,10 @@ fn find_with_fallback(
         ocr_error: None,
         last_error: None,
     };
-    wait_for_stats_panel(session, stop, waiting, &mut outcome)?;
+    // OCR confirms the Stats panel is on screen where supported; memory discovery follows.
+    if crate::screen_stats::SUPPORTED {
+        wait_for_stats_panel(session, stop, waiting, &mut outcome)?;
+    }
     memory_discovery(session, stop, MEMORY_RETRIES + 1, &mut outcome)?;
     Ok(outcome)
 }
@@ -431,7 +439,7 @@ impl TrainerApp {
                     self.running = games.running();
                     self.set_session(
                         games
-                            .select(self.settings.game_path(), self.session.as_ref())
+                            .select(self.game_path().as_deref(), self.session.as_ref())
                             .cloned(),
                     );
                 }
@@ -622,13 +630,13 @@ impl TrainerApp {
             match result {
                 Ok(status) => {
                     self.update_asset = status.available;
-                    self.update_status = if self.update_asset.is_some() {
+                    self.update_status = if status.newer {
                         "Update Available"
                     } else {
                         "Latest"
                     }
                     .into();
-                    if manual && self.update_asset.is_none() {
+                    if manual && !status.newer {
                         self.using_latest_until = Some(Instant::now() + Duration::from_secs(3));
                     }
                 }
@@ -690,6 +698,14 @@ impl TrainerApp {
     fn reset_apply(&mut self) {
         self.apply = None;
         self.field_issues.clear();
+    }
+
+    /// The configured game binary, or the official install location when none was chosen.
+    fn game_path(&self) -> Option<PathBuf> {
+        self.settings
+            .game_path()
+            .map(PathBuf::from)
+            .or_else(process::default_game_path)
     }
 
     fn save_preferences(&mut self) {
@@ -776,10 +792,16 @@ impl TrainerApp {
 
     fn locate(&mut self) -> Option<PathBuf> {
         event("settings.locate_game", format_args!("dialog_opened"));
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("Windows executable", &["exe"])
-            .pick_file()
-        else {
+        let mut dialog = rfd::FileDialog::new();
+        if cfg!(windows) {
+            dialog = dialog.add_filter("Windows executable", &["exe"]);
+        } else if let Some(directory) = process::default_game_path()
+            .as_deref()
+            .and_then(std::path::Path::parent)
+        {
+            dialog = dialog.set_directory(directory);
+        }
+        let Some(path) = dialog.pick_file() else {
             event("settings.locate_game_cancelled", format_args!(""));
             return None;
         };
@@ -791,7 +813,7 @@ impl TrainerApp {
                 "settings.game_path_rejected",
                 format_args!("unexpected_executable_name"),
             );
-            self.error = Some("Choose AzerothSurvivorsGame.exe.".into());
+            self.error = Some(format!("Choose {}.", process::GAME_EXE));
             return None;
         }
         if let Err(error) = self.settings.set_game_path(&path) {
@@ -814,11 +836,7 @@ impl TrainerApp {
                         Button::new("Run Game"),
                     )
                     .clicked()
-                    && let Some(path) = self
-                        .settings
-                        .game_path()
-                        .map(PathBuf::from)
-                        .or_else(|| self.locate())
+                    && let Some(path) = self.game_path().or_else(|| self.locate())
                 {
                     event("process.launch_requested", format_args!(""));
                     self.launch_result = Some(task(context, move || process::launch(&path)));
@@ -834,7 +852,7 @@ impl TrainerApp {
                 {
                     self.confirm_stop = self.session.clone();
                 }
-                if ui.button("Locate exe file").clicked() {
+                if ui.button(LOCATE_LABEL).clicked() {
                     self.locate();
                 }
                 if ui.button("Advanced").clicked() {
@@ -1199,7 +1217,8 @@ impl TrainerApp {
         use std::fmt::Write as _;
 
         let mut report = format!(
-            "Trainer {VERSION} / Windows x64\n\nSESSION\n{}\n",
+            "Trainer {VERSION} / {}\n\nSESSION\n{}\n",
+            process::PLATFORM,
             self.status
         );
         if let Some(session) = &self.session {

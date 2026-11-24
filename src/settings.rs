@@ -8,11 +8,24 @@ use serde_json::{Map, Value};
 const DIRECTORY: &str = "Azeroth Survivor Reborn Trainer";
 const FILE: &str = "reborn-settings.json";
 
+#[cfg(windows)]
 pub fn state_directory() -> io::Result<PathBuf> {
     std::env::var_os("LOCALAPPDATA")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(|base| PathBuf::from(base).join(DIRECTORY))
         .ok_or_else(|| io::Error::other("No Windows user settings directory."))
+}
+
+#[cfg(not(windows))]
+pub fn state_directory() -> io::Result<PathBuf> {
+    std::env::var_os("HOME")
+        .map(|base| {
+            PathBuf::from(base)
+                .join("Library")
+                .join("Application Support")
+                .join(DIRECTORY)
+        })
+        .ok_or_else(|| io::Error::other("No user settings directory (HOME is not set)."))
 }
 
 #[derive(Default)]

@@ -23,7 +23,12 @@ use windows_sys::Win32::{
     },
 };
 
-pub const GAME_EXE: &str = "AzerothSurvivorsGame.exe";
+use super::{GAME_EXE, Games, Session, same_path};
+
+/// Windows has no fixed install location; the user locates the executable.
+pub fn default_game_path() -> Option<PathBuf> {
+    None
+}
 
 struct Handle(HANDLE);
 
@@ -42,54 +47,6 @@ impl Drop for Handle {
         // This object owns exactly one successful Windows handle.
         unsafe { CloseHandle(self.0) };
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Session {
-    pub pid: u32,
-    pub created: u64,
-    pub path: PathBuf,
-}
-
-#[derive(Debug, Default)]
-pub struct Games {
-    sessions: Vec<Session>,
-    inaccessible: usize,
-}
-
-impl Games {
-    pub fn running(&self) -> bool {
-        self.inaccessible > 0 || !self.sessions.is_empty()
-    }
-
-    pub fn select(&self, preferred: Option<&Path>, current: Option<&Session>) -> Option<&Session> {
-        if let Some(session) =
-            current.and_then(|current| self.sessions.iter().find(|s| *s == current))
-        {
-            return Some(session);
-        }
-        if self.inaccessible > 0 {
-            return None;
-        }
-        if let [session] = self.sessions.as_slice() {
-            return Some(session);
-        }
-        let preferred = preferred?;
-        let mut matches = self
-            .sessions
-            .iter()
-            .filter(|session| same_path(&session.path, preferred));
-        let selected = matches.next()?;
-        matches.next().is_none().then_some(selected)
-    }
-}
-
-fn same_path(a: &Path, b: &Path) -> bool {
-    fn comparable(path: &Path) -> String {
-        let raw = path.to_string_lossy().replace('/', "\\");
-        raw.strip_prefix(r"\\?\").unwrap_or(&raw).to_lowercase()
-    }
-    comparable(a) == comparable(b)
 }
 
 fn wide_string(raw: &[u16]) -> String {
@@ -477,40 +434,6 @@ impl StatWriter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn session(pid: u32, path: &str) -> Session {
-        Session {
-            pid,
-            created: 5,
-            path: path.into(),
-        }
-    }
-
-    #[test]
-    fn ambiguous_processes_need_an_exact_selection() {
-        let first = session(1, "C:/Game/AzerothSurvivorsGame.exe");
-        let second = session(2, "D:/Game/AzerothSurvivorsGame.exe");
-        let games = Games {
-            sessions: vec![first.clone(), second],
-            inaccessible: 0,
-        };
-        assert!(games.select(None, None).is_none());
-        assert_eq!(
-            games.select(Some(Path::new(r"c:\game\AzerothSurvivorsGame.exe")), None),
-            Some(&first)
-        );
-        assert_eq!(games.select(None, Some(&first)), Some(&first));
-    }
-
-    #[test]
-    fn inaccessible_process_blocks_automatic_selection() {
-        let games = Games {
-            sessions: vec![session(1, "C:/Game/AzerothSurvivorsGame.exe")],
-            inaccessible: 1,
-        };
-        assert!(games.running());
-        assert!(games.select(None, None).is_none());
-    }
 
     #[test]
     fn writer_acquires_idle_mutex_and_serializes_stat_writes() {

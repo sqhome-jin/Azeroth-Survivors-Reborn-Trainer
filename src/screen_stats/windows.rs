@@ -2,6 +2,7 @@
 use image::{RgbaImage, imageops::FilterType};
 use std::{io, ptr::null_mut, slice, time::Instant};
 
+use super::panel_text;
 use crate::diagnostic_log::event;
 use windows::{
     Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap},
@@ -93,65 +94,6 @@ pub fn read(pid: u32) -> io::Result<String> {
     panel_text(&rows).ok_or_else(|| {
         io::Error::other("Stats panel was not recognized. Open Character in Reborn and try again.")
     })
-}
-
-fn panel_text(rows: &str) -> Option<String> {
-    let mut lines = rows
-        .lines()
-        .map(str::trim)
-        .skip_while(|line| !line.eq_ignore_ascii_case("Stats"));
-    lines.next()?;
-    let mut section = "";
-    let mut readings = Vec::new();
-    for line in lines {
-        if ["RUN", "OFFENSE", "DEFENSE", "UTILITY"]
-            .iter()
-            .any(|heading| heading.eq_ignore_ascii_case(line))
-        {
-            section = line;
-            readings.push(line.to_owned());
-            continue;
-        }
-        if section.is_empty() {
-            continue;
-        }
-        let labels: &[&str] = if section.eq_ignore_ascii_case("RUN") {
-            &["Time", "Experience", "Kills", "Gold", "Rerolls"]
-        } else if section.eq_ignore_ascii_case("OFFENSE") {
-            &[
-                "Damage",
-                "Critical strike",
-                "Critical damage",
-                "Cooldown reduction",
-                "Area of effect",
-                "Extra targets",
-                "Echo",
-            ]
-        } else if section.eq_ignore_ascii_case("DEFENSE") {
-            &["Health per second", "Health", "Damage reduction"]
-        } else {
-            &["Movement speed", "Pickup range", "Gold find", "Luck"]
-        };
-        if labels.iter().any(|label| {
-            line.get(..label.len())
-                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(label))
-                && line.get(label.len()..).is_some_and(|value| {
-                    value.starts_with(' ') && value.bytes().any(|byte| byte.is_ascii_digit())
-                })
-        }) {
-            readings.push(line.to_owned());
-        }
-    }
-    (readings
-        .iter()
-        .any(|line| line.eq_ignore_ascii_case("OFFENSE"))
-        && readings
-            .iter()
-            .any(|line| line.eq_ignore_ascii_case("DEFENSE"))
-        && readings
-            .iter()
-            .any(|line| line.bytes().any(|byte| byte.is_ascii_digit())))
-    .then(|| readings.join("\n"))
 }
 
 fn recognize(
@@ -339,20 +281,5 @@ fn capture(pid: u32) -> io::Result<Frame> {
         DeleteObject(bitmap);
         DeleteDC(dc);
         frame
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ignores_gear_bonuses_and_requires_the_stats_panel() {
-        let text = "Equipment\nDamage +21%\nStats\nRUN\nGold 2\nOFFENSE\nDamage +27%\nDEFENSE\nHealth 72 / 353\nUTILITY\nLuck +35%";
-        let report = panel_text(text).unwrap();
-        assert!(report.contains("Damage +27%"));
-        assert!(!report.contains("Damage +21%"));
-        assert!(report.contains("Health 72 / 353"));
-        assert!(panel_text("Equipment\nDamage +21%").is_none());
     }
 }
