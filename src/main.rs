@@ -29,6 +29,21 @@ fn main() -> eframe::Result {
         }
         return Ok(());
     }
+    #[cfg(windows)]
+    if argument
+        .as_deref()
+        .is_some_and(|value| value == "--smoke-test-release")
+    {
+        let expected = arguments.next().and_then(|tag| tag.into_string().ok());
+        let recognized = update::check("0.0.0").is_ok_and(|status| {
+            expected.as_deref() == Some(&status.tag) && status.available.is_some()
+        });
+        return if recognized {
+            Ok(())
+        } else {
+            std::process::exit(1);
+        };
+    }
     let _log = settings::state_directory()
         .and_then(|directory| diagnostic_log::Log::start(directory.join("reborn-rust.log")))
         .ok();
