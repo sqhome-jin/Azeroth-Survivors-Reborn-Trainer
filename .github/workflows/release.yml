@@ -65,17 +65,25 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo build --release --locked
 
-      - name: Collect locally runnable scan test
+      - name: Sign and package the Apple Silicon app
         run: |
-          set -o pipefail
-          cargo test --locked --no-run --message-format=json |
-            jq -er 'select(.profile.test == true and .target.name == "reborn-trainer" and .executable != null) | .executable' |
-            while IFS= read -r executable; do cp "$executable" reborn-scan-test; done
-          tar -czf reborn-scan-test.tar.gz reborn-scan-test
+          test "$(uname -m)" = arm64
+          app="dist/Azeroth Survivor Reborn Trainer.app"
+          mkdir -p "$app/Contents/MacOS"
+          cp target/release/reborn-trainer "$app/Contents/MacOS/"
+          cp assets/macos/Info.plist "$app/Contents/"
+          version="$(cargo metadata --locked --no-deps --format-version 1 |
+            jq -er '.packages[] | select(.name == "reborn-trainer") | .version')"
+          plutil -insert CFBundleVersion -string "$version" "$app/Contents/Info.plist"
+          plutil -insert CFBundleShortVersionString -string "$version" "$app/Contents/Info.plist"
+          codesign --force --sign - --entitlements assets/macos/debugger.entitlements "$app"
+          codesign --verify --strict "$app"
+          ditto -c -k --keepParent "$app" dist/Azeroth.Survivor.Reborn.Trainer.macos-arm64.zip
       - uses: actions/upload-artifact@v7.0.2
         with:
-          name: macos-scan-test
-          path: reborn-scan-test.tar.gz
+          name: Reborn-macOS-arm64
+          path: dist/Azeroth.Survivor.Reborn.Trainer.macos-arm64.zip
+          if-no-files-found: error
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

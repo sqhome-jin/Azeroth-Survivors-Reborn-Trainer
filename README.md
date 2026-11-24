@@ -63,11 +63,30 @@ as a backup. Starting with v1.0.1, the updater waits for the replacement to
 confirm that its UI initialized. If startup fails, it restores and reopens the
 previous EXE.
 
+## macOS on Apple Silicon
+
+Download the **Reborn-macOS-arm64** artifact from a successful GitHub Actions
+run and extract the trainer ZIP inside it. Move **Azeroth Survivor Reborn
+Trainer.app** to Applications. The app is ad-hoc signed with the debugger
+entitlement so it can attach to the game. macOS may require you to approve the
+app under **System Settings → Privacy & Security** after the first launch
+attempt, or to authorize it when it attaches to the game.
+
+Install and start the game through its official launcher. The trainer looks for
+the game at `~/Library/Application Support/Azeroth Survivors/AzerothSurvivorsGame`
+by default. Start a run and click **Find**. macOS discovers the character
+directly from game memory. On game version 0.7.4, the verified layout covers
+the combat stats listed above. Health, Run Gold, Rerolls, and screen OCR are
+unavailable in the macOS build.
+
+Download new macOS builds manually from Actions. The log is at
+`~/Library/Application Support/Azeroth Survivor Reborn Trainer/reborn-rust.log`.
+
 ## Repository
 
 - `src/` contains the Rust trainer, stat verification, Windows integration, and updater.
 - `assets/` contains the app icon and logo.
-- `.github/workflows/release.yml` builds and tests on Windows and publishes the standalone EXE for newer versions on `main`.
+- `.github/workflows/release.yml` builds and tests both platforms, uploads the macOS app as an Actions artifact, and publishes the standalone Windows EXE for newer versions on `main`.
 
 ### Local folders
 

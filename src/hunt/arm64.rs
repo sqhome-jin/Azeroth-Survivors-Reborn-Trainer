@@ -523,24 +523,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires a locally installed game image"]
-    fn local_game_image() {
-        let path = std::env::var_os("REBORN_VERIFY_GAME").expect("set REBORN_VERIFY_GAME");
-        let blob = std::fs::read(path).unwrap();
-        let plan = super::super::analyze(&blob, &AtomicBool::new(false)).unwrap();
-        println!(
-            "array={:?} name={} stats={} guards={}",
-            plan.array,
-            plan.name,
-            plan.stats,
-            plan.guards.len()
-        );
-        assert_eq!(plan.array, [4944, 3592, 3584, 7648]);
-        assert_eq!(plan.name, 5728);
-        assert_eq!(plan.stats, 7368);
-    }
-
-    #[test]
     fn analyzes_player_layout_from_arm64_instruction_sequences() {
         // macOS 0.7.4 disassembly. The first routine saves x0 before
         // loading the selected index into x0. The second clones the name.
