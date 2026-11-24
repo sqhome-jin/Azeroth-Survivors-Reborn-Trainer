@@ -22,14 +22,43 @@ use crate::{
     update,
 };
 
+const MACOS: bool = cfg!(target_os = "macos");
 const GOLD: Color32 = Color32::from_rgb(227, 190, 105);
-const MINT: Color32 = Color32::from_rgb(114, 224, 190);
-const FRAME: Color32 = Color32::from_rgb(20, 32, 44);
-const SURFACE: Color32 = Color32::from_rgb(36, 54, 75);
-const MUTED: Color32 = Color32::from_rgb(169, 184, 200);
-const TEXT: Color32 = Color32::from_rgb(229, 233, 239);
-const ACCENT: Color32 = Color32::from_rgb(86, 214, 176);
-const ACCENT_TEXT: Color32 = Color32::from_rgb(16, 37, 31);
+const MINT: Color32 = if MACOS {
+    Color32::from_rgb(117, 224, 184)
+} else {
+    Color32::from_rgb(114, 224, 190)
+};
+const FRAME: Color32 = if MACOS {
+    Color32::from_rgb(24, 26, 31)
+} else {
+    Color32::from_rgb(20, 32, 44)
+};
+const SURFACE: Color32 = if MACOS {
+    Color32::from_rgb(39, 43, 52)
+} else {
+    Color32::from_rgb(36, 54, 75)
+};
+const MUTED: Color32 = if MACOS {
+    Color32::from_rgb(163, 171, 187)
+} else {
+    Color32::from_rgb(169, 184, 200)
+};
+const TEXT: Color32 = if MACOS {
+    Color32::from_rgb(235, 239, 248)
+} else {
+    Color32::from_rgb(229, 233, 239)
+};
+const ACCENT: Color32 = if MACOS {
+    Color32::from_rgb(110, 165, 255)
+} else {
+    Color32::from_rgb(86, 214, 176)
+};
+const ACCENT_TEXT: Color32 = if MACOS {
+    Color32::from_rgb(14, 28, 53)
+} else {
+    Color32::from_rgb(16, 37, 31)
+};
 const EDITOR_WIDTH: f32 = 242.0;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const LOCATE_LABEL: &str = if cfg!(windows) {
@@ -313,6 +342,26 @@ impl TrainerApp {
         visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(53, 81, 108);
         visuals.widgets.active.weak_bg_fill = Color32::from_rgb(53, 81, 108);
         visuals.selection.bg_fill = Color32::from_rgb(35, 68, 63);
+        if MACOS {
+            visuals.extreme_bg_color = Color32::from_rgb(22, 24, 29);
+            visuals.faint_bg_color = Color32::from_white_alpha(7);
+            visuals.selection.bg_fill = Color32::from_rgb(43, 67, 105);
+            visuals.selection.stroke.color = TEXT;
+            visuals.window_corner_radius = egui::CornerRadius::same(14);
+            for (widget, background) in [
+                (&mut visuals.widgets.inactive, SURFACE),
+                (&mut visuals.widgets.hovered, Color32::from_rgb(54, 62, 77)),
+                (&mut visuals.widgets.active, Color32::from_rgb(62, 76, 98)),
+                (&mut visuals.widgets.open, SURFACE),
+            ] {
+                widget.bg_fill = background;
+                widget.weak_bg_fill = background;
+                widget.fg_stroke.color = TEXT;
+                widget.bg_stroke.color = Color32::from_white_alpha(27);
+                widget.corner_radius = egui::CornerRadius::same(8);
+            }
+            context.egui_ctx.set_theme(egui::ThemePreference::Dark);
+        }
         context.egui_ctx.set_visuals(visuals);
         context.egui_ctx.style_mut(|style| {
             style.spacing.item_spacing = egui::vec2(8.0, 7.0);
@@ -601,8 +650,13 @@ impl TrainerApp {
                     let count = result.applied.len();
                     self.applied_stats.extend(result.applied);
                     let warning = self.field_issues.len();
+                    let outcome = if MACOS {
+                        "written and read back"
+                    } else {
+                        "applied"
+                    };
                     self.status = format!(
-                        "Apply · {count} applied{}",
+                        "Apply · {count} {outcome}{}",
                         if warning > 0 {
                             format!(" · {warning} skipped")
                         } else {
@@ -833,7 +887,7 @@ impl TrainerApp {
                         !self.running
                             && self.launch_result.is_none()
                             && self.process_result.is_none(),
-                        Button::new("Run Game"),
+                        Button::new(if MACOS { "Run" } else { "Run Game" }),
                     )
                     .clicked()
                     && let Some(path) = self.game_path().or_else(|| self.locate())
@@ -846,16 +900,22 @@ impl TrainerApp {
                         self.session.is_some()
                             && self.stop_result.is_none()
                             && self.apply.is_none(),
-                        Button::new("Stop Game"),
+                        Button::new(if MACOS { "Stop" } else { "Stop Game" }),
                     )
                     .clicked()
                 {
                     self.confirm_stop = self.session.clone();
                 }
-                if ui.button(LOCATE_LABEL).clicked() {
+                if ui
+                    .button(if MACOS { "Locate…" } else { LOCATE_LABEL })
+                    .clicked()
+                {
                     self.locate();
                 }
-                if ui.button("Advanced").clicked() {
+                if ui
+                    .button(if MACOS { "Diagnostics" } else { "Advanced" })
+                    .clicked()
+                {
                     event("diagnostics.opened", format_args!(""));
                     self.show_details = true;
                     self.next_log_read = Instant::now();
@@ -917,7 +977,10 @@ impl TrainerApp {
                         self.update_result = Some(task(context, || update::check(VERSION)));
                     }
                 }
-                if ui.button("Github Page").clicked() {
+                if ui
+                    .button(if MACOS { "GitHub" } else { "Github Page" })
+                    .clicked()
+                {
                     context.open_url(egui::OpenUrl::new_tab(update::PROJECT));
                 }
             });
@@ -1021,7 +1084,7 @@ impl TrainerApp {
                         .as_ref()
                         .is_some_and(|s| s.values.contains_key(stat.key));
                     let (status, status_color) = if self.applied_stats.contains(stat.key) {
-                        ("Applied", MINT)
+                        (if MACOS { "Written" } else { "Applied" }, MINT)
                     } else if verified || current.is_some() {
                         ("Found", TEXT)
                     } else {
@@ -1034,7 +1097,11 @@ impl TrainerApp {
                                 egui::vec2(ui.available_width(), 22.0),
                                 egui::Layout::top_down(egui::Align::Center),
                                 |ui| {
-                                    let fill = if checked {
+                                    let fill = if MACOS && checked {
+                                        Color32::from_rgb(44, 99, 176)
+                                    } else if MACOS {
+                                        SURFACE
+                                    } else if checked {
                                         Color32::from_rgb(31, 107, 87)
                                     } else {
                                         Color32::from_rgb(44, 58, 72)
@@ -1047,6 +1114,11 @@ impl TrainerApp {
                                         self.apply.is_none(),
                                         egui::Checkbox::without_text(&mut checked),
                                     );
+                                    let response = if MACOS {
+                                        response.on_hover_text("Enabling a mapped stat writes its target immediately after Find.")
+                                    } else {
+                                        response
+                                    };
                                     if response.changed() {
                                         self.enabled[index] = checked;
                                         preferences_changed = true;
@@ -1122,9 +1194,14 @@ impl TrainerApp {
         } else {
             "Find"
         };
-        let find = Button::new(RichText::new(title).size(24.0).strong().color(ACCENT_TEXT))
-            .fill(ACCENT)
-            .min_size(egui::vec2(width, 53.0));
+        let find = Button::new(
+            RichText::new(title)
+                .size(if MACOS { 15.0 } else { 24.0 })
+                .strong()
+                .color(ACCENT_TEXT),
+        )
+        .fill(ACCENT)
+        .min_size(egui::vec2(width, if MACOS { 34.0 } else { 53.0 }));
         if ui
             .add_enabled(applying || finding || self.session.is_some(), find)
             .clicked()
@@ -1187,7 +1264,10 @@ impl TrainerApp {
             && self.scan.is_none();
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(can_apply, Button::new("Apply").fill(ACCENT))
+                .add_enabled(
+                    can_apply,
+                    Button::new(RichText::new("Apply").color(ACCENT_TEXT)).fill(ACCENT),
+                )
                 .clicked()
                 && self.commit_target()
             {
@@ -1321,16 +1401,21 @@ impl eframe::App for TrainerApp {
                         ui.image((logo.id(), egui::vec2(32.0, 32.0)));
                     }
                     ui.heading(
-                        RichText::new("AZEROTH SURVIVORS REBORN")
-                            .size(26.0)
-                            .color(GOLD)
+                        RichText::new(if MACOS { "Reborn Trainer" } else { "AZEROTH SURVIVORS REBORN" })
+                            .size(if MACOS { 22.0 } else { 26.0 })
+                            .color(if MACOS { TEXT } else { GOLD })
                             .strong(),
                     );
                 });
                 ui.vertical(|ui| {
                     right_aligned_row(ui, ui.spacing().interact_size.y, |ui| {
                         if let Some(session) = &self.session {
-                            ui.colored_label(MINT, format!("Connected · PID {}", session.pid));
+                            if MACOS {
+                                ui.colored_label(MINT, "Game connected")
+                                    .on_hover_text(format!("PID {}", session.pid));
+                            } else {
+                                ui.colored_label(MINT, format!("Connected · PID {}", session.pid));
+                            }
                         } else if self.running {
                             ui.label(
                                 "Reborn is running. The process could not be uniquely selected.",
@@ -1380,7 +1465,18 @@ impl eframe::App for TrainerApp {
                             .fill(FRAME)
                             .inner_margin(egui::Margin::symmetric(11, 0)),
                     )
-                    .show_inside(ui, |ui| self.stat_editor(context, ui));
+                    .show_inside(ui, |ui| {
+                        if MACOS {
+                            egui::Frame::new()
+                                .fill(SURFACE)
+                                .stroke(egui::Stroke::new(1.0, Color32::from_white_alpha(25)))
+                                .corner_radius(14)
+                                .inner_margin(egui::Margin::same(14))
+                                .show(ui, |ui| self.stat_editor(context, ui));
+                        } else {
+                            self.stat_editor(context, ui);
+                        }
+                    });
                 egui::CentralPanel::default()
                     .frame(egui::Frame::new())
                     .show_inside(ui, |ui| {
