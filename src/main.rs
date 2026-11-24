@@ -3,6 +3,9 @@
 mod app;
 mod diagnostic_log;
 mod hunt;
+mod language;
+#[cfg(target_os = "macos")]
+mod macos_chrome;
 mod process;
 mod screen_stats;
 mod settings;

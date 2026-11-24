@@ -16,6 +16,7 @@ use egui_extras::{Column, TableBuilder};
 use crate::{
     diagnostic_log::event,
     hunt::{self, Snapshot},
+    language::Language,
     process::{self, Games, Session},
     settings::Settings,
     stats_ui::{STATS, Stat},
@@ -250,6 +251,11 @@ impl Drop for Apply {
 }
 
 pub struct TrainerApp {
+    language: Language,
+    #[cfg(target_os = "macos")]
+    native_chrome_installed: bool,
+    #[cfg(target_os = "macos")]
+    chinese_font_loaded: bool,
     settings: Settings,
     session: Option<Session>,
     process_result: Option<Receiver<io::Result<Games>>>,
@@ -284,6 +290,22 @@ pub struct TrainerApp {
     using_latest_until: Option<Instant>,
     install_result: Option<Receiver<io::Result<()>>>,
     update_ready: Option<PathBuf>,
+}
+
+fn status_color(ui: &egui::Ui) -> Color32 {
+    if MACOS && !ui.visuals().dark_mode {
+        Color32::from_rgb(21, 103, 77)
+    } else {
+        MINT
+    }
+}
+
+fn muted_color(ui: &egui::Ui) -> Color32 {
+    if MACOS && !ui.visuals().dark_mode {
+        Color32::from_rgb(83, 95, 115)
+    } else {
+        MUTED
+    }
 }
 
 fn right_aligned_row(ui: &mut egui::Ui, height: f32, content: impl FnOnce(&mut egui::Ui)) {
@@ -344,27 +366,56 @@ impl TrainerApp {
         visuals.widgets.active.weak_bg_fill = Color32::from_rgb(53, 81, 108);
         visuals.selection.bg_fill = Color32::from_rgb(35, 68, 63);
         if MACOS {
+            let mut light = egui::Visuals::light();
+            light.panel_fill = Color32::from_rgb(242, 244, 249);
+            light.window_fill = Color32::WHITE;
+            light.faint_bg_color = Color32::from_black_alpha(5);
+            light.selection.bg_fill = Color32::from_rgb(211, 228, 255);
+            light.selection.stroke.color = Color32::from_rgb(21, 39, 68);
+            light.override_text_color = Some(Color32::from_rgb(32, 39, 53));
             visuals.extreme_bg_color = Color32::from_rgb(22, 24, 29);
             visuals.faint_bg_color = Color32::from_white_alpha(7);
             visuals.selection.bg_fill = Color32::from_rgb(43, 67, 105);
             visuals.selection.stroke.color = TEXT;
-            visuals.window_corner_radius = egui::CornerRadius::same(14);
-            for (widget, background) in [
-                (&mut visuals.widgets.inactive, SURFACE),
-                (&mut visuals.widgets.hovered, Color32::from_rgb(54, 62, 77)),
-                (&mut visuals.widgets.active, Color32::from_rgb(62, 76, 98)),
-                (&mut visuals.widgets.open, SURFACE),
+            for (palette, backgrounds, border) in [
+                (
+                    &mut visuals,
+                    [
+                        SURFACE,
+                        Color32::from_rgb(54, 62, 77),
+                        Color32::from_rgb(62, 76, 98),
+                    ],
+                    Color32::from_white_alpha(27),
+                ),
+                (
+                    &mut light,
+                    [
+                        Color32::WHITE,
+                        Color32::from_rgb(232, 238, 248),
+                        Color32::from_rgb(218, 230, 249),
+                    ],
+                    Color32::from_black_alpha(32),
+                ),
             ] {
-                widget.bg_fill = background;
-                widget.weak_bg_fill = background;
-                widget.fg_stroke.color = TEXT;
-                widget.bg_stroke.color = Color32::from_white_alpha(27);
-                widget.corner_radius = egui::CornerRadius::same(8);
+                palette.window_corner_radius = egui::CornerRadius::same(14);
+                for (widget, background) in [
+                    (&mut palette.widgets.inactive, backgrounds[0]),
+                    (&mut palette.widgets.hovered, backgrounds[1]),
+                    (&mut palette.widgets.active, backgrounds[2]),
+                    (&mut palette.widgets.open, backgrounds[0]),
+                ] {
+                    widget.bg_fill = background;
+                    widget.weak_bg_fill = background;
+                    widget.bg_stroke = egui::Stroke::new(1.0, border);
+                    widget.corner_radius = egui::CornerRadius::same(8);
+                }
             }
-            context.egui_ctx.set_theme(egui::ThemePreference::Dark);
+            context.egui_ctx.set_visuals_of(egui::Theme::Dark, visuals);
+            context.egui_ctx.set_visuals_of(egui::Theme::Light, light);
+        } else {
+            context.egui_ctx.set_visuals(visuals);
         }
-        context.egui_ctx.set_visuals(visuals);
-        context.egui_ctx.style_mut(|style| {
+        context.egui_ctx.all_styles_mut(|style| {
             style.spacing.item_spacing = egui::vec2(8.0, 7.0);
             style.spacing.button_padding = egui::vec2(12.0, 7.0);
             style.spacing.interact_size.y = 27.0;
@@ -407,6 +458,11 @@ impl TrainerApp {
         let enabled = std::array::from_fn(|index| STATS[index].checked(prefs));
         let targets = std::array::from_fn(|index| STATS[index].saved_target(prefs));
         Self {
+            language: Language::default(),
+            #[cfg(target_os = "macos")]
+            native_chrome_installed: false,
+            #[cfg(target_os = "macos")]
+            chinese_font_loaded: false,
             settings,
             error,
             session: None,
@@ -656,14 +712,22 @@ impl TrainerApp {
                     } else {
                         "applied"
                     };
-                    self.status = format!(
-                        "Apply · {count} {outcome}{}",
+                    self.status = if self.language.chinese {
                         if warning > 0 {
-                            format!(" · {warning} skipped")
+                            format!("已确认 {count} 项，跳过 {warning} 项。")
                         } else {
-                            String::new()
+                            format!("已在游戏内存中确认 {count} 项。")
                         }
-                    );
+                    } else {
+                        format!(
+                            "Apply · {count} {outcome}{}",
+                            if warning > 0 {
+                                format!(" · {warning} skipped")
+                            } else {
+                                String::new()
+                            }
+                        )
+                    };
                     event(
                         "apply.batch_finished",
                         format_args!("applied={count} skipped={warning}"),
@@ -885,6 +949,7 @@ impl TrainerApp {
     }
 
     fn footer(&mut self, context: &egui::Context, ui: &mut egui::Ui) {
+        let language = self.language;
         ui.columns(2, |columns| {
             columns[0].horizontal(|ui| {
                 if ui
@@ -892,7 +957,11 @@ impl TrainerApp {
                         !self.running
                             && self.launch_result.is_none()
                             && self.process_result.is_none(),
-                        Button::new(if MACOS { "Run" } else { "Run Game" }),
+                        Button::new(if MACOS {
+                            language.text("Run", "启动")
+                        } else {
+                            "Run Game"
+                        }),
                     )
                     .clicked()
                     && let Some(path) = self.game_path().or_else(|| self.locate())
@@ -905,20 +974,32 @@ impl TrainerApp {
                         self.session.is_some()
                             && self.stop_result.is_none()
                             && self.apply.is_none(),
-                        Button::new(if MACOS { "Stop" } else { "Stop Game" }),
+                        Button::new(if MACOS {
+                            language.text("Stop", "停止")
+                        } else {
+                            language.text("Stop Game", "停止游戏")
+                        }),
                     )
                     .clicked()
                 {
                     self.confirm_stop = self.session.clone();
                 }
                 if ui
-                    .button(if MACOS { "Locate…" } else { LOCATE_LABEL })
+                    .button(if MACOS {
+                        language.text("Locate…", "定位游戏…")
+                    } else {
+                        LOCATE_LABEL
+                    })
                     .clicked()
                 {
                     self.locate();
                 }
                 if ui
-                    .button(if MACOS { "Diagnostics" } else { "Advanced" })
+                    .button(if MACOS {
+                        language.text("Diagnostics", "诊断")
+                    } else {
+                        "Advanced"
+                    })
                     .clicked()
                 {
                     event("diagnostics.opened", format_args!(""));
@@ -928,9 +1009,12 @@ impl TrainerApp {
             });
             let ui = &mut columns[1];
             update_button_row(ui, |ui| {
-                let mut status = RichText::new(format!("{VERSION} - {}", self.update_status))
-                    .size(16.0)
-                    .strong();
+                let mut status = RichText::new(format!(
+                    "{VERSION} · {}",
+                    language.status(&self.update_status)
+                ))
+                .size(16.0)
+                .strong();
                 if self.update_status == "Update Available" {
                     let seconds = context.input(|input| input.time);
                     let glow = ((seconds * std::f64::consts::TAU / 5.0).cos() + 1.0) * 0.5;
@@ -948,7 +1032,7 @@ impl TrainerApp {
                         ));
                     context.request_repaint_after(Duration::from_millis(50));
                 } else {
-                    status = status.color(MINT);
+                    status = status.color(status_color(ui));
                 }
                 let response = ui.label(status);
                 if let Some(error) = &self.update_error {
@@ -960,15 +1044,15 @@ impl TrainerApp {
                     .is_some_and(|until| Instant::now() < until);
                 let idle = self.update_result.is_none() && self.install_result.is_none() && !latest;
                 let label = if self.install_result.is_some() {
-                    "Downloading…"
+                    language.text("Downloading…", "正在下载…")
                 } else if self.update_result.is_some() {
-                    "Checking…"
+                    language.text("Checking…", "正在检查…")
                 } else if latest {
-                    "Using Latest"
+                    language.text("Using Latest", "已是最新版")
                 } else if self.update_asset.is_some() {
-                    "Download & Install"
+                    language.text("Download & Install", "下载并安装")
                 } else {
-                    "Check updates"
+                    language.text("Check updates", "检查更新")
                 };
                 if ui.add_enabled(idle, Button::new(label)).clicked() {
                     self.update_error = None;
@@ -998,19 +1082,23 @@ impl TrainerApp {
     }
 
     fn stop_confirmation(&mut self, context: &egui::Context) {
+        let language = self.language;
         let Some(session) = self.confirm_stop.clone() else {
             return;
         };
         let mut cancel = false;
         let mut stop = false;
         egui::Modal::new(egui::Id::new("stop-reborn")).show(context, |ui| {
-            ui.heading("Stop Reborn?");
+            ui.heading(language.text("Stop Reborn?", "停止游戏？"));
             ui.label(format!("PID {}", session.pid));
             ui.label(session.path.display().to_string());
-            ui.label("Stopping Reborn can lose unsaved run progress.");
+            ui.label(language.text(
+                "Stopping Reborn can lose unsaved run progress.",
+                "停止游戏可能丢失本局未保存的进度。",
+            ));
             ui.horizontal(|ui| {
-                cancel = ui.button("Cancel").clicked();
-                stop = ui.button("Stop Game").clicked();
+                cancel = ui.button(language.text("Cancel", "取消")).clicked();
+                stop = ui.button(language.text("Stop Game", "停止游戏")).clicked();
             });
         });
         if cancel || context.input(|input| input.key_pressed(egui::Key::Escape)) {
@@ -1051,7 +1139,12 @@ impl TrainerApp {
     }
 
     fn stats_table(&mut self, context: &egui::Context, ui: &mut egui::Ui, width: f32) {
-        let titles = ["Enabled", "Stat", "Current", "Target", "Status"];
+        let language = self.language;
+        let titles = if language.chinese {
+            ["启用", "属性", "当前值", "目标值", "状态"]
+        } else {
+            ["Enabled", "Stat", "Current", "Target", "Status"]
+        };
         let spacing = ui.spacing().item_spacing.x * (titles.len() - 1) as f32;
         let widths = [
             76.0,
@@ -1081,7 +1174,11 @@ impl TrainerApp {
             })
             .body(|mut body| {
                 for (index, stat) in STATS.iter().enumerate() {
-                    let target = stat.target(self.targets[index]);
+                    let target = if language.chinese && stat.key == "health" {
+                        "回满".into()
+                    } else {
+                        stat.target(self.targets[index])
+                    };
                     let mut checked = self.enabled[index];
                     let current = self.stat_display(stat);
                     let verified = self
@@ -1089,11 +1186,11 @@ impl TrainerApp {
                         .as_ref()
                         .is_some_and(|s| s.values.contains_key(stat.key));
                     let (status, status_color) = if self.applied_stats.contains(stat.key) {
-                        (if MACOS { "Confirmed" } else { "Applied" }, MINT)
+                        (if MACOS { language.text("Confirmed", "已确认") } else { "Applied" }, status_color(ui))
                     } else if verified || current.is_some() {
-                        ("Found", TEXT)
+                        (language.text("Found", "已读取"), ui.visuals().text_color())
                     } else {
-                        ("-", MUTED)
+                        ("-", muted_color(ui))
                     };
                     body.row(29.0, |mut row| {
                         row.set_selected(index == self.selected);
@@ -1105,7 +1202,7 @@ impl TrainerApp {
                                     let fill = if MACOS && checked {
                                         Color32::from_rgb(44, 99, 176)
                                     } else if MACOS {
-                                        SURFACE
+                                        ui.visuals().widgets.inactive.bg_fill
                                     } else if checked {
                                         Color32::from_rgb(31, 107, 87)
                                     } else {
@@ -1120,7 +1217,7 @@ impl TrainerApp {
                                         egui::Checkbox::without_text(&mut checked),
                                     );
                                     let response = if MACOS {
-                                        response.on_hover_text("Enabling a mapped stat writes its target immediately after Find.")
+                                        response.on_hover_text(language.text("Enabling a mapped stat writes its target immediately after Find.", "查找完成后，勾选已验证的属性会立即写入目标值。"))
                                     } else {
                                         response
                                     };
@@ -1139,7 +1236,7 @@ impl TrainerApp {
                             );
                         });
                         row.col(|ui| {
-                            ui.label(stat.label);
+                            ui.label(language.text(stat.label, stat.chinese_label));
                         });
                         row.col(|ui| {
                             ui.label(current.as_deref().unwrap_or("—"));
@@ -1175,7 +1272,8 @@ impl TrainerApp {
         let time = ui.input(|input| input.time) as f32;
         let (rect, _) =
             ui.allocate_exact_size(egui::vec2(ui.available_width(), 8.0), egui::Sense::hover());
-        ui.painter().rect_filled(rect, 4, SURFACE);
+        ui.painter()
+            .rect_filled(rect, 4, ui.visuals().widgets.inactive.bg_fill);
         let width = rect.width() * 0.32;
         let phase = (time * 0.45).fract() * 2.0;
         let progress = if phase < 1.0 { phase } else { 2.0 - phase };
@@ -1189,15 +1287,16 @@ impl TrainerApp {
     }
 
     fn stat_editor(&mut self, context: &egui::Context, ui: &mut egui::Ui) {
+        let language = self.language;
         let width = ui.available_width();
         let finding = self.scan.is_some();
         let applying = self.apply.is_some();
         let title = if finding {
-            "Stop search"
+            language.text("Stop search", "停止查找")
         } else if applying {
-            "Cancel Apply"
+            language.text("Cancel Apply", "取消应用")
         } else {
-            "Find"
+            language.text("Find", "查找")
         };
         let find = Button::new(
             RichText::new(title)
@@ -1227,7 +1326,8 @@ impl TrainerApp {
             && ui
                 .add_enabled(
                     !applying && !finding && self.session.is_some(),
-                    Button::new("Read current values").min_size(egui::vec2(width, 29.0)),
+                    Button::new(language.text("Read current values", "读取当前值"))
+                        .min_size(egui::vec2(width, 29.0)),
                 )
                 .clicked()
         {
@@ -1241,25 +1341,46 @@ impl TrainerApp {
             && snapshot.stats.is_some()
             && !snapshot.values.is_empty()
         {
-            ui.colored_label(MINT, format!("Stats found: {}", snapshot.values.len()));
+            ui.colored_label(
+                status_color(ui),
+                format!(
+                    "{} {}",
+                    language.text("Stats found:", "已读取属性："),
+                    snapshot.values.len()
+                ),
+            );
         }
-        ui.colored_label(MINT, &self.status);
+        ui.colored_label(status_color(ui), language.status(&self.status));
         if let Some(scan) = &self.scan {
             let elapsed = scan.started.elapsed().as_secs();
             ui.label(
-                RichText::new(format!("{}:{:02} elapsed", elapsed / 60, elapsed % 60)).color(MUTED),
+                RichText::new(format!(
+                    "{}:{:02} {}",
+                    elapsed / 60,
+                    elapsed % 60,
+                    language.text("elapsed", "已用时")
+                ))
+                .color(muted_color(ui)),
             );
         }
         ui.separator();
         let stat = &STATS[self.selected];
         let current = self.stat_display(stat);
-        ui.heading(RichText::new(stat.label).size(19.0).strong());
+        ui.heading(
+            RichText::new(language.text(stat.label, stat.chinese_label))
+                .size(19.0)
+                .strong(),
+        );
         ui.label(
             RichText::new(current.as_deref().unwrap_or("—"))
                 .size(26.0)
-                .color(MINT),
+                .color(status_color(ui)),
         );
-        ui.label(if stat.percent { "Target (%)" } else { "Target" });
+        ui.label(if stat.percent {
+            language.text("Target (%)", "目标值（%）")
+        } else {
+            language.text("Target", "目标值")
+        });
         let editable = self.apply.is_none() && stat.key != "health";
         let reply = ui.add_enabled(
             editable,
@@ -1281,7 +1402,8 @@ impl TrainerApp {
             if ui
                 .add_enabled(
                     can_apply,
-                    Button::new(RichText::new("Apply").color(ACCENT_TEXT)).fill(ACCENT),
+                    Button::new(RichText::new(language.text("Apply", "应用")).color(ACCENT_TEXT))
+                        .fill(ACCENT),
                 )
                 .clicked()
                 && self.commit_target()
@@ -1289,7 +1411,10 @@ impl TrainerApp {
                 self.start_apply(context, [(stat.key, self.targets[self.selected])].into());
             }
             if ui
-                .add_enabled(editable, Button::new("Use maximum"))
+                .add_enabled(
+                    editable,
+                    Button::new(language.text("Use maximum", "使用最大值")),
+                )
                 .clicked()
             {
                 self.target_entry = stat.max.to_string();
@@ -1305,7 +1430,7 @@ impl TrainerApp {
         } else {
             "Find applies checked targets once."
         };
-        ui.label(RichText::new(hint).color(MUTED));
+        ui.label(RichText::new(language.status(hint)).color(muted_color(ui)));
     }
 
     fn diagnostic_text(&self) -> String {
@@ -1400,10 +1525,23 @@ impl TrainerApp {
 }
 
 impl eframe::App for TrainerApp {
-    fn update(&mut self, context: &egui::Context, _: &mut eframe::Frame) {
+    fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
+        #[cfg(target_os = "macos")]
+        {
+            if !self.native_chrome_installed {
+                self.native_chrome_installed = crate::macos_chrome::install(_frame);
+            }
+            let (chinese, theme) = crate::macos_chrome::preferences();
+            self.language.chinese = chinese;
+            if chinese && !self.chinese_font_loaded {
+                self.chinese_font_loaded = crate::macos_chrome::install_chinese_font(context);
+            }
+            context.set_theme(theme);
+        }
+        let language = self.language;
         self.poll(context);
         let frame = egui::Frame::new()
-            .fill(FRAME)
+            .fill(context.style().visuals.panel_fill)
             .inner_margin(egui::Margin::same(16));
         egui::TopBottomPanel::bottom("trainer-footer")
             .frame(frame)
@@ -1416,9 +1554,9 @@ impl eframe::App for TrainerApp {
                         ui.image((logo.id(), egui::vec2(32.0, 32.0)));
                     }
                     ui.heading(
-                        RichText::new(if MACOS { "Reborn Trainer" } else { "AZEROTH SURVIVORS REBORN" })
+                        RichText::new(if MACOS { language.text("Reborn Trainer", "Reborn 修改器") } else { "AZEROTH SURVIVORS REBORN" })
                             .size(if MACOS { 22.0 } else { 26.0 })
-                            .color(if MACOS { TEXT } else { GOLD })
+                            .color(if MACOS { ui.visuals().text_color() } else { GOLD })
                             .strong(),
                     );
                 });
@@ -1426,17 +1564,17 @@ impl eframe::App for TrainerApp {
                     right_aligned_row(ui, ui.spacing().interact_size.y, |ui| {
                         if let Some(session) = &self.session {
                             if MACOS {
-                                ui.colored_label(MINT, "Game connected")
+                                ui.colored_label(status_color(ui), language.text("Game connected", "已连接游戏"))
                                     .on_hover_text(format!("PID {}", session.pid));
                             } else {
-                                ui.colored_label(MINT, format!("Connected · PID {}", session.pid));
+                                ui.colored_label(status_color(ui), format!("Connected · PID {}", session.pid));
                             }
                         } else if self.running {
                             ui.label(
-                                "Reborn is running. The process could not be uniquely selected.",
+                                language.text("Reborn is running. The process could not be uniquely selected.", "游戏正在运行，暂时无法确定要连接的进程。"),
                             );
                         } else {
-                            ui.label("Waiting for Reborn.");
+                            ui.label(language.text("Waiting for Reborn.", "等待游戏启动。"));
                         }
                     });
                     if self.launch_result.is_some() || self.stop_result.is_some() {
@@ -1477,14 +1615,14 @@ impl eframe::App for TrainerApp {
                     .resizable(false)
                     .frame(
                         egui::Frame::new()
-                            .fill(FRAME)
+                            .fill(ui.visuals().panel_fill)
                             .inner_margin(egui::Margin::symmetric(11, 0)),
                     )
                     .show_inside(ui, |ui| {
                         if MACOS {
                             egui::Frame::new()
-                                .fill(SURFACE)
-                                .stroke(egui::Stroke::new(1.0, Color32::from_white_alpha(25)))
+                                .fill(ui.visuals().widgets.inactive.bg_fill)
+                                .stroke(ui.visuals().widgets.inactive.bg_stroke)
                                 .corner_radius(14)
                                 .inner_margin(egui::Margin::same(14))
                                 .show(ui, |ui| self.stat_editor(context, ui));
@@ -1519,23 +1657,31 @@ impl eframe::App for TrainerApp {
             }
             let text = self.diagnostic_text();
             let mut capture = false;
-            egui::Window::new("Detection details")
+            egui::Window::new(language.text("Detection details", "检测详情"))
                 .open(&mut self.show_details)
                 .default_width(680.0)
                 .show(context, |ui| {
-                    ui.label(
-                        "Find locates the Stats panel with OCR, then reads and sets values in memory. Open the Character panel with C.",
-                    );
+                    if MACOS {
+                        ui.label(language.text(
+                            "Read current values to check the live game without applying targets.",
+                            "使用「读取当前值」可以查看游戏实时数值，避免应用目标值。",
+                        ));
+                    } else {
+                        ui.label("Find locates the Stats panel with OCR, then reads and sets values in memory. Open the Character panel with C.");
+                    }
                     ui.horizontal(|ui| {
-                        if ui.button("Copy details").clicked() {
+                        if ui.button(language.text("Copy details", "复制详情")).clicked() {
                             event("diagnostics.copied", format_args!(""));
                             context.copy_text(text.clone());
                         }
+                        if !crate::screen_stats::SUPPORTED {
+                            return;
+                        }
                         let busy = self.screen_stats_result.is_some();
                         let label = if busy {
-                            "Reading Stats panel…"
+                            language.text("Reading Stats panel…", "正在读取属性面板…")
                         } else {
-                            "Read Stats panel"
+                            language.text("Read Stats panel", "读取属性面板")
                         };
                         capture = ui
                             .add_enabled(self.session.is_some() && !busy, Button::new(label))

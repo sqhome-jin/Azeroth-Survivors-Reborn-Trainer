@@ -79,6 +79,10 @@ directly from game memory. On game version 0.7.4, the verified layout covers
 the combat stats listed above. Health, Run Gold, Rerolls, and screen OCR are
 unavailable in the macOS build.
 
+Use the title bar menus to choose English or Simplified Chinese and System,
+Light, or Dark appearance. The menus use native Liquid Glass on macOS 26 and
+later. The app remembers both selections.
+
 Download new macOS builds manually from Actions. The log is at
 `~/Library/Application Support/Azeroth Survivor Reborn Trainer/reborn-rust.log`.
 

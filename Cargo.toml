@@ -40,6 +40,7 @@ windows-sys = { version = "0.61", features = [
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"
 mach2 = "0.4"
+raw-window-handle = "0.6"
 
 [profile.release]
 lto = "thin"
@@ -47,3 +48,6 @@ strip = "debuginfo"
 
 [build-dependencies]
 winresource = "0.1"
+
+[target.'cfg(target_os = "macos")'.build-dependencies]
+cc = "1"
