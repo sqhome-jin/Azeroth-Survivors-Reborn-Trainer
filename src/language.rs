@@ -8,7 +8,7 @@ impl Language {
         if self.chinese { chinese } else { english }
     }
 
-    pub fn status<'a>(self, english: &'a str) -> &'a str {
+    pub fn status(self, english: &str) -> &str {
         let chinese = match english {
             "Start Reborn to find a character." => "请启动游戏以查找角色。",
             "Start a run, then click Find." => "请开始一局，再点按「查找」。",
