@@ -1157,6 +1157,9 @@ impl TrainerApp {
         let mut selected = self.selected;
         let mut preferences_changed = false;
         let mut auto_apply = hunt::Targets::new();
+        let confirmed_color = status_color(ui);
+        let found_color = ui.visuals().text_color();
+        let unavailable_color = muted_color(ui);
         let mut table = TableBuilder::new(ui)
             .striped(true)
             .sense(egui::Sense::click())
@@ -1186,11 +1189,11 @@ impl TrainerApp {
                         .as_ref()
                         .is_some_and(|s| s.values.contains_key(stat.key));
                     let (status, status_color) = if self.applied_stats.contains(stat.key) {
-                        (if MACOS { language.text("Confirmed", "已确认") } else { "Applied" }, status_color(ui))
+                        (if MACOS { language.text("Confirmed", "已确认") } else { "Applied" }, confirmed_color)
                     } else if verified || current.is_some() {
-                        (language.text("Found", "已读取"), ui.visuals().text_color())
+                        (language.text("Found", "已读取"), found_color)
                     } else {
-                        ("-", muted_color(ui))
+                        ("-", unavailable_color)
                     };
                     body.row(29.0, |mut row| {
                         row.set_selected(index == self.selected);
