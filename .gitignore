@@ -1,3 +1,4 @@
+.DS_Store
 reborn-settings.json
 reborn-recovery.json
 *.tmp
@@ -10,6 +11,7 @@ backups/
 build/
 target/
 dist/
+macos/.build/
 release/
 /releases/
 __pycache__/

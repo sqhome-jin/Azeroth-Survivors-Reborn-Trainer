@@ -97,20 +97,6 @@ pub fn recent_lines(path: &Path) -> io::Result<String> {
     Ok(lines.join("\n"))
 }
 
-#[cfg(windows)]
-fn timestamp() -> String {
-    use windows_sys::Win32::{Foundation::SYSTEMTIME, System::SystemInformation::GetSystemTime};
-
-    let mut utc = SYSTEMTIME::default();
-    // Windows populates the provided SYSTEMTIME with a UTC timestamp.
-    unsafe { GetSystemTime(&mut utc) };
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
-        utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, utc.wMilliseconds,
-    )
-}
-
-#[cfg(not(windows))]
 fn timestamp() -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

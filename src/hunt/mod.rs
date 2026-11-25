@@ -15,7 +15,6 @@ use crate::{
 };
 
 mod arm64;
-mod x86;
 
 type Array = [usize; 4]; // selected index, count, vector pointer, stride
 type Guard = (usize, Vec<u8>);
@@ -95,13 +94,11 @@ struct Candidates {
 }
 
 fn analyze(blob: &[u8], stop: &AtomicBool) -> io::Result<Plan> {
-    let candidates = if blob.starts_with(b"MZ") {
-        x86::scan(blob, stop)?
-    } else if blob.starts_with(&arm64::MH_MAGIC_64.to_le_bytes()) {
+    let candidates = if blob.starts_with(&arm64::MH_MAGIC_64.to_le_bytes()) {
         arm64::scan(blob, stop)?
     } else {
         return Err(io::Error::other(
-            "Expected a Windows x64 or macOS arm64 game image.",
+            "Expected a macOS arm64 Mach-O game image.",
         ));
     };
     let Candidates {
@@ -461,6 +458,12 @@ pub struct VerifiedStats {
     index: usize,
     name: String,
     stamp: (u64, Option<SystemTime>),
+}
+
+impl VerifiedStats {
+    pub fn session_ref(&self) -> &Session {
+        &self.session
+    }
 }
 
 pub struct ApplyOutcome {

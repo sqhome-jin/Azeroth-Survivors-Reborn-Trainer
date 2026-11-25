@@ -84,13 +84,18 @@ pub const STATS: [Stat; 17] = [
     stat!("rerolls", "Rerolls", "重掷次数", 0, 9999, false),
 ];
 
+#[allow(dead_code)]
 impl Stat {
+    pub fn default_enabled(&self) -> bool {
+        matches!(self.key, "damage" | "cooldown" | "area" | "luck")
+    }
+
     pub fn checked(&self, prefs: Option<&Value>) -> bool {
         prefs
             .and_then(|data| data.get("enabled"))
             .and_then(Value::as_array)
             .map_or_else(
-                || matches!(self.key, "damage" | "cooldown" | "area" | "luck"),
+                || self.default_enabled(),
                 |keys| keys.iter().any(|key| key.as_str() == Some(self.key)),
             )
     }
@@ -108,31 +113,6 @@ impl Stat {
     pub fn valid_target(&self, target: u32) -> bool {
         (self.min..=self.max).contains(&target)
     }
-
-    pub fn target(&self, value: u32) -> String {
-        if self.key == "health" {
-            return "Full".into();
-        }
-        let prefix = if self.key == "max_health" { "≥ " } else { "" };
-        format!("{prefix}{}", self.display(u64::from(value)))
-    }
-
-    pub fn display(&self, value: u64) -> String {
-        let unit = if self.percent { "%" } else { "" };
-        format!("{}{unit}", grouped(value))
-    }
-}
-
-pub fn grouped(number: u64) -> String {
-    let number = number.to_string();
-    let mut value = String::with_capacity(number.len() + number.len() / 3);
-    for (index, digit) in number.chars().enumerate() {
-        if index != 0 && (number.len() - index).is_multiple_of(3) {
-            value.push(',');
-        }
-        value.push(digit);
-    }
-    value
 }
 
 #[cfg(test)]
@@ -145,23 +125,9 @@ mod tests {
         let prefs =
             json!({"enabled": ["damage"], "targets": {"damage": 700, "crit": 42, "rerolls": -1}});
         let stat = |key| STATS.iter().find(|stat| stat.key == key).unwrap();
-        assert_eq!(
-            stat("damage").target(stat("damage").saved_target(Some(&prefs))),
-            "700%"
-        );
-        assert_eq!(
-            stat("crit").target(stat("crit").saved_target(Some(&prefs))),
-            "42%"
-        );
-        assert_eq!(
-            stat("rerolls").target(stat("rerolls").saved_target(Some(&prefs))),
-            "9,999"
-        );
-        assert_eq!(stat("health").target(0), "Full");
-        assert_eq!(
-            stat("max_health").target(stat("max_health").saved_target(None)),
-            "≥ 1,000,000"
-        );
+        assert_eq!(stat("damage").saved_target(Some(&prefs)), 700);
+        assert_eq!(stat("crit").saved_target(Some(&prefs)), 42);
+        assert_eq!(stat("rerolls").saved_target(Some(&prefs)), 9999);
         assert!(stat("cooldown").checked(None));
         assert!(!stat("cooldown").checked(Some(&prefs)));
     }

@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>reborn-trainer</string>
+    <string>Azeroth Survivor Reborn Trainer</string>
     <key>CFBundleIdentifier</key>
     <string>io.github.sqhome-jin.azeroth-survivor-reborn-trainer</string>
     <key>CFBundleName</key>
