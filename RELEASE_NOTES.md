@@ -1,3 +1,9 @@
+Azeroth Survivor Reborn Trainer for MacOS v1.1.6
+
+- Rename the product to Azeroth Survivor Reborn Trainer for MacOS.
+- Make the default README Chinese-first, with English docs in README.en.md.
+- Point users to the upstream Windows releases page, and keep update checks from interrupting the Find status when GitHub has no release yet.
+
 Azeroth Survivor Reborn Trainer v1.1.5
 
 - Ship as a macOS Apple Silicon app only. The UI is rewritten in SwiftUI with a System Settings-style sidebar.
